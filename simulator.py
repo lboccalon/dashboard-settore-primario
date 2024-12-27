@@ -11,21 +11,6 @@ def min_max_scale(values, desired_min, desired_max):
     return scaled
 
 
-def get_growing_condition(temp: float):
-    if temp < -1:
-        return "Frost Damage"
-    elif temp < 10:
-        return "Dormant"
-    elif temp < 18:
-        return "Growing"
-    elif temp < 34:
-        return "Optimal"
-    elif temp < 41:
-        return "Stress"
-    else:
-        return "Damage"
-
-
 def generate_environmental_data(start_date, end_date):
     # Generate date range
     dates = pd.date_range(start=start_date, end=end_date, freq="D")
@@ -88,16 +73,70 @@ def generate_environmental_data(start_date, end_date):
     df["humidity"] = base_humidity + rain_effect + humidity_variation
     df["humidity"] = df["humidity"].clip(40, 95)
 
-    # Growing condition
-    df["growing_condition"] = df["temperature"].apply(get_growing_condition)
-
     # Drop helper column
     df = df.drop("day_of_year", axis=1)
 
     return df
 
 
+def simulate_vineyard_yield(data: pd.DataFrame, field_size_hectares: int = 100):
+    # Filter data for the last year
+    last_year = data.loc[data.index >= data.index[-1] - pd.DateOffset(years=1)]
+
+    # Define baseline yield per hectare (kg)
+    baseline_yield_per_hectare = np.random.randint(8000, 12000)  # 8,000-12,000 kg
+    baseline_yield_total = baseline_yield_per_hectare * field_size_hectares
+
+    # Aggregate environmental factors
+    avg_temperature = last_year["temperature"].mean()
+    avg_rainfall = last_year["rain_mm"].sum()
+    avg_sun_hours = last_year["sun_hours"].mean()
+    avg_humidity = last_year["humidity"].mean()
+
+    # Factor adjustments
+    # Temperature: Optimal range 18°C to 28°C
+    temp_factor = 1.0
+    if avg_temperature < 18:
+        temp_factor -= (18 - avg_temperature) * 0.05  # 5% penalty per °C below optimal
+    elif avg_temperature > 28:
+        temp_factor -= (avg_temperature - 28) * 0.05  # 5% penalty per °C above optimal
+
+    # Rainfall: Optimal annual total ~600mm-800mm
+    rain_factor = 1.0
+    if avg_rainfall < 600:
+        rain_factor -= (600 - avg_rainfall) * 0.001  # 0.1% penalty per mm below
+    elif avg_rainfall > 800:
+        rain_factor -= (avg_rainfall - 800) * 0.001  # 0.1% penalty per mm above
+
+    # Sunlight: Optimal average 12 hours/day
+    sun_factor = min(avg_sun_hours / 12, 1.0)  # Cap at 1.0
+
+    # Humidity: High humidity reduces yield
+    humidity_factor = 1.0
+    if avg_humidity > 80:
+        humidity_factor -= (avg_humidity - 80) * 0.01  # 1% penalty per unit above 80
+
+    # Compute total adjustment factor
+    adjustment_factor = temp_factor * rain_factor * sun_factor * humidity_factor
+
+    # Adjust the baseline yield
+    adjusted_yield = baseline_yield_total * adjustment_factor
+
+    return {
+        "baseline_yield_kg": baseline_yield_total,
+        "adjusted_yield_kg": adjusted_yield,
+        "adjustment_factor": adjustment_factor,
+        "avg_temperature": avg_temperature,
+        "avg_rainfall_mm": avg_rainfall,
+        "avg_sun_hours": avg_sun_hours,
+        "avg_humidity": avg_humidity,
+    }
+
+
 # Generate 5 years of data
 start_date = "2024-01-01"
 end_date = "2028-12-31"
 data = generate_environmental_data(start_date, end_date)
+
+# Simulate vineyard yield
+yield_results = simulate_vineyard_yield(data)
