@@ -6,7 +6,14 @@ from simulator import data
 
 st.dataframe(data)
 
-for dim in ["temperature", "humidity", "sun_hours", "rain_mm", "cloud_coverage"]:
+for dim in [
+    "temperature",
+    "humidity",
+    "sun_hours",
+    "rain_mm",
+    "cloud_coverage",
+    "growing_condition",
+]:
     fig = plt.figure()
     plt.plot(data.index, data[dim])
     st.pyplot(fig)

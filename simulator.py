@@ -11,6 +11,21 @@ def min_max_scale(values, desired_min, desired_max):
     return scaled
 
 
+def get_growing_condition(temp: float):
+    if temp < -1:
+        return "Frost Damage"
+    elif temp < 10:
+        return "Dormant"
+    elif temp < 18:
+        return "Growing"
+    elif temp < 34:
+        return "Optimal"
+    elif temp < 41:
+        return "Stress"
+    else:
+        return "Damage"
+
+
 def generate_environmental_data(start_date, end_date):
     # Generate date range
     dates = pd.date_range(start=start_date, end=end_date, freq="D")
@@ -38,11 +53,10 @@ def generate_environmental_data(start_date, end_date):
     df["sun_hours"] = seasonal_sun
 
     # Rain probability based on seasonal pattern
-    # Peak in November (38% chance) and minimum in July (7.4% chance - 2.3 days / 31)
     rain_prob = 0.22 + 0.16 * np.sin(2 * np.pi * (df["day_of_year"] + 45) / 365)
     rain_events = np.random.random(len(df)) < rain_prob
 
-    # Rain amount based on monthly totals (108mm in November, 15mm in July)
+    # Rain amount based on monthly totals
     base_rain = 61.5 + 46.5 * np.sin(2 * np.pi * (df["day_of_year"] + 45) / 365)
     monthly_days = rain_prob * 30  # approximate days of rain per month
     daily_intensity = base_rain / monthly_days
@@ -63,7 +77,7 @@ def generate_environmental_data(start_date, end_date):
     df.loc[df["rain_mm"] > 0, "cloud_coverage"] = 100
     df["cloud_coverage"] = df["cloud_coverage"].clip(0, 100)
 
-    # Humidity - now influenced by temperature and rain
+    # Humidity - influenced by temperature and rain
     base_humidity = 70 - 0.3 * (df["temperature"] - 20)
     rain_effect = np.where(
         df["rain_mm"] > 0,
@@ -73,6 +87,9 @@ def generate_environmental_data(start_date, end_date):
     humidity_variation = np.random.normal(0, 3, len(df))
     df["humidity"] = base_humidity + rain_effect + humidity_variation
     df["humidity"] = df["humidity"].clip(40, 95)
+
+    # Growing condition
+    df["growing_condition"] = df["temperature"].apply(get_growing_condition)
 
     # Drop helper column
     df = df.drop("day_of_year", axis=1)
