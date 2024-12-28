@@ -1,6 +1,5 @@
 import pandas as pd
 import numpy as np
-from datetime import datetime, timedelta
 
 
 def min_max_scale(values, desired_min, desired_max):
@@ -28,6 +27,7 @@ def generate_environmental_data(start_date, end_date):
 
     # Ensure temperature stays within Anzio ranges
     df["temperature"] = min_max_scale(df["temperature"], 6, 28)
+    df["temperature"] = df["temperature"].round(1)
 
     # Hours of sun (correlated with temperature)
     max_sun_hours = 14  # Summer
@@ -53,7 +53,9 @@ def generate_environmental_data(start_date, end_date):
     # Ensure minimum 1mm for wet days and adjust sun hours
     df.loc[df["rain_mm"] < 1, "rain_mm"] = 0
     df.loc[df["rain_mm"] > 0, "sun_hours"] *= 0.3
+    df["rain_mm"] = df["rain_mm"].round()
     df["sun_hours"] = df["sun_hours"].clip(0, 14)
+    df["sun_hours"] = df["sun_hours"].round(2)
 
     # Cloud coverage
     seasonal_cloud = 29 + 17 * np.sin(2 * np.pi * (df["day_of_year"] + 80) / 365)
@@ -61,6 +63,7 @@ def generate_environmental_data(start_date, end_date):
     df["cloud_coverage"] = seasonal_cloud + cloud_variation
     df.loc[df["rain_mm"] > 0, "cloud_coverage"] = 100
     df["cloud_coverage"] = df["cloud_coverage"].clip(0, 100)
+    df["cloud_coverage"] = df["cloud_coverage"].round()
 
     # Humidity - influenced by temperature and rain
     base_humidity = 70 - 0.3 * (df["temperature"] - 20)
@@ -72,6 +75,7 @@ def generate_environmental_data(start_date, end_date):
     humidity_variation = np.random.normal(0, 3, len(df))
     df["humidity"] = base_humidity + rain_effect + humidity_variation
     df["humidity"] = df["humidity"].clip(40, 95)
+    df["humidity"] = df["humidity"].round()
 
     # Drop helper column
     df = df.drop("day_of_year", axis=1)
@@ -138,5 +142,4 @@ start_date = "2024-01-01"
 end_date = "2028-12-31"
 data = generate_environmental_data(start_date, end_date)
 
-# Simulate vineyard yield
-yield_results = simulate_vineyard_yield(data)
+
